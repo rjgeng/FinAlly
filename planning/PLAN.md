@@ -455,3 +455,65 @@ The container is designed to deploy to AWS App Runner, Render, or any container 
 - AI chat (mocked): send a message, receive a response, trade execution appears inline
 - SSE resilience: disconnect and verify reconnection
 
+---
+
+## 13. Review Notes
+
+*Added 2026-04-03 — questions, gaps, and simplification opportunities identified during plan review.*
+
+### Clarifications Needed
+
+**1. "Daily change %" source is undefined**
+Section 10 specifies the watchlist should show "daily change %", but the price cache only stores latest price, previous price, and timestamp. There's no day-open price in the simulator or schema. Clarify: should this be "change since page load" (computable from SSE data), "change since session start", or dropped in favor of just showing the flash direction?
+
+**2. Main chart data source is missing**
+There is no endpoint for historical price data for the selected ticker. The sparklines accumulate from SSE since page load — does the main chart work the same way (empty on load, fills progressively)? If so, state this explicitly. If not, a `/api/prices/{ticker}/history` endpoint or equivalent is missing from Section 8.
+
+**3. SSE push rate vs Massive API poll rate mismatch**
+The SSE stream pushes at ~500ms, but the Massive free tier only polls every 15 seconds. Should the SSE server push only when the cache updates (event-driven), or push at 500ms regardless (which floods clients with 30 identical events per real update)? The plan needs to specify this behavior explicitly.
+
+**4. Position row lifecycle on full sell**
+The E2E test says a position "updates or disappears" when shares are sold. Specify: should the row be deleted when `quantity` reaches 0, or kept with `quantity=0`? This affects the positions table display and LLM context injection.
+
+**5. `watchlist_changes.action` valid values not defined**
+The structured output schema shows `"action": "add"` but never lists the valid enum values. Add `"add" | "remove"` explicitly so agent implementors don't guess.
+
+**6. `actions` column storage schema not defined**
+`chat_messages.actions` is documented as "JSON — trades executed, watchlist changes made" but the schema of that JSON is never specified. The frontend needs to parse this to render inline confirmations in the chat. Define the shape (e.g., mirrors the LLM structured output, or a post-execution summary with actual fill prices).
+
+**7. How many chat messages does the LLM context load?**
+"Loads recent conversation history" is vague. Specify a max (e.g., last 20 messages) so agents don't build an unbounded context window.
+
+**8. Watchlist and positions: are they independent?**
+Selling all shares of a ticker — should it be auto-removed from the watchlist, or do watchlist and positions remain fully independent? Neither behavior is obvious and both are defensible; pick one.
+
+**9. Massive API: is it Polygon.io?**
+The env var comment says `# Massive (Polygon.io) API key`. Are these the same service or two different ones? Use a consistent name throughout to avoid confusion for agents implementing the integration.
+
+**10. New watchlist tickers and Massive polling**
+If the user adds a ticker while the Massive poller is running, does the poller pick it up on the next cycle? The plan says it "polls for the union of all watched tickers" but doesn't specify whether the poller reads from the database dynamically or uses a snapshot taken at startup.
+
+### Gaps in the Spec
+
+**11. Trade bar pre-fill behavior**
+The trade bar has a "ticker field." Does clicking a ticker in the watchlist pre-populate this field? This is implied but unspecified — state it explicitly so the frontend agent doesn't have to guess.
+
+**12. Empty-state for portfolio heatmap**
+On first launch ($10k cash, no positions), the heatmap has nothing to render. Define the empty state (placeholder text, hidden panel, cash shown as a block, etc.).
+
+**13. LLM mock response shape**
+Section 9 says `LLM_MOCK=true` returns "deterministic mock responses" but doesn't define what the mock response looks like. E2E tests that assert on specific text or actions will be fragile unless the mock payload is specified here.
+
+### Simplification Opportunities
+
+**14. UUID primary keys on `watchlist` and `positions` are unnecessary**
+Both tables already have a `UNIQUE (user_id, ticker)` constraint, which uniquely identifies every row. Using that as a composite PK eliminates the `id` UUID column and removes a source of unnecessary complexity from two tables. `portfolio_snapshots` similarly doesn't need a UUID `id` — `(user_id, recorded_at)` is sufficient.
+
+**15. `users_profile` table is overkill for single-user**
+The table will always contain exactly one row. Consider storing `cash_balance` as a single-value config or a simpler key/value table. If multi-user is a future goal worth scaffolding, keep it — but document this tradeoff so agents don't over-engineer around it.
+
+**16. `backend/db/` path naming is confusing alongside top-level `db/`**
+Two directories both named `db/` (one at `backend/db/`, one at the top level) are easy to conflate in agent prompts and code. Consider renaming `backend/db/` to `backend/schema/` or `backend/migrations/` to make the distinction obvious.
+
+**17. `start_mac.sh` label vs Linux users**
+The script is described as "macOS/Linux" but the filename says `_mac`. A Linux user won't reach for a `_mac.sh` file. Rename to `start.sh` / `stop.sh` or `start_unix.sh` / `stop_unix.sh`.
