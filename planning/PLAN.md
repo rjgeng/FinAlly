@@ -266,7 +266,7 @@ All tables include a `user_id` column defaulting to `"default"`. This is hardcod
 
 | Method | Path                      | Description                                                                     |
 | ------ | ------------------------- | ------------------------------------------------------------------------------- |
-| GET    | `/api/watchlist`          | Current watchlist tickers with latest prices and session change where available |
+| GET    | `/api/watchlist`          | Current watchlist tickers with latest cached prices                             |
 | POST   | `/api/watchlist`          | Add a ticker: `{ticker}`                                                        |
 | DELETE | `/api/watchlist/{ticker}` | Remove a ticker                                                                 |
 
@@ -375,16 +375,22 @@ The LLM should be prompted as **FinAlly, an AI trading assistant** and instructe
 
 ### LLM Mock Mode
 
-When `LLM_MOCK=true`, the backend returns deterministic mock responses instead of calling OpenRouter.
+When `LLM_MOCK=true`, the backend returns deterministic rule-based responses instead of calling OpenRouter. Rules are evaluated in order against the lowercased user message:
 
-Canonical mock payload for tests:
+| Message contains | Response |
+| ---------------- | -------- |
+| `"buy"` | Buy 1 share of the first ticker mentioned, defaulting to `AAPL` |
+| `"sell"` | Sell 1 share of the first ticker mentioned, defaulting to `AAPL` |
+| `"add"` + a ticker | Add that ticker to the watchlist |
+| `"remove"` + a ticker | Remove that ticker from the watchlist |
+| anything else | No-action assistant reply only |
+
+Example mock response for a "buy TSLA" message:
 
 ```json
 {
-  "message": "Mock mode: bought 1 share of AAPL.",
-  "trades": [
-    {"ticker": "AAPL", "side": "buy", "quantity": 1}
-  ],
+  "message": "Mock mode: buy 1 TSLA.",
+  "trades": [{"ticker": "TSLA", "side": "buy", "quantity": 1}],
   "watchlist_changes": []
 }
 ```
@@ -519,7 +525,7 @@ These decisions are intentionally fixed for v1 and should not be re-opened unles
 10. Massive poller reads the watchlist **dynamically each cycle**
 11. Clicking a watchlist ticker **prefills the trade bar ticker**
 12. Empty heatmap shows **"No open positions yet"**
-13. `LLM_MOCK=true` uses the canonical mock payload defined in this document
+13. `LLM_MOCK=true` uses the rule-based deterministic mock defined in this document
 
 ## 14. Implementation Notes for Agents
 
