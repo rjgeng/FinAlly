@@ -164,6 +164,11 @@ class SimulatorProvider(MarketDataProvider):
     def _add_ticker(self, ticker: str) -> None:
         state = _build_ticker_state(ticker)
         self._states[ticker] = state
+        # NOTE: prev_close is set to the seed price at initialisation and is never
+        # updated, because FinAlly v1 has no concept of market sessions or daily
+        # closes. After extended runtime the "session change %" shown on the frontend
+        # will reflect cumulative GBM drift from the seed price rather than a true
+        # rolling session window. Acceptable for v1 simulation purposes.
         self._cache[ticker] = PriceSnapshot(
             ticker=ticker,
             price=state.current_price,

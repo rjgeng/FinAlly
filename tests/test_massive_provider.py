@@ -292,10 +292,10 @@ async def test_fetch_and_update_logs_generic_error(caplog):
 
 @pytest.mark.asyncio
 async def test_fetch_and_update_raises_if_not_started():
-    """Calling _fetch_and_update without start() should raise AssertionError."""
+    """Calling _fetch_and_update without start() should raise RuntimeError."""
     provider = make_provider(["AAPL"])
     # _client is None — provider not started
-    with pytest.raises(AssertionError):
+    with pytest.raises(RuntimeError):
         await provider._fetch_and_update(["AAPL"])
 
 

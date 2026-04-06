@@ -94,7 +94,8 @@ class MassiveProvider(MarketDataProvider):
             await asyncio.sleep(POLL_INTERVAL)
 
     async def _fetch_and_update(self, tickers: list[str]) -> None:
-        assert self._client is not None, "MassiveProvider.start() must be called first"
+        if self._client is None:
+            raise RuntimeError("MassiveProvider.start() must be called before _fetch_and_update()")
         ticker_str = ",".join(tickers)
         url = f"{BASE_URL}{SNAPSHOT_PATH}"
         params = {"tickers": ticker_str, "apiKey": self._api_key}
