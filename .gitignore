@@ -15,6 +15,7 @@ downloads/
 eggs/
 .eggs/
 lib/
+!frontend/lib/
 lib64/
 parts/
 sdist/
@@ -193,6 +194,12 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# FinAlly SQLite database (volume-mounted at runtime)
+db/finally.db
+db/finally.db-journal
+db/finally.db-wal
+db/finally.db-shm
 
 # Cursor
 #  Cursor is an AI-powered code editor. `.cursorignore` specifies files/directories to
